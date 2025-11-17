@@ -5,13 +5,58 @@ const port = process.env.PORT || 5000
 
 const app = express()
 
+//JWT Token 
+
+const jwt = require('jsonwebtoken');
+const cookieParser = require('cookie-parser');
+//
+
 // midleware
-app.use(cors())
+app.use(cors({
+   origin: [
+      'http://localhost:5173',
+      'https://coffee-store-9.netlify.app',
+
+   ],
+   credentials: true
+}));
+
 app.use(express.json())
+app.use(cookieParser()) 
+
+const logger = (req,res, next ) =>{
+   //console.log( 'inside the logger middelwar');
+   next(); // otherwise this will stop going forward
+}
+
+const verifyToken  = (req, res, next ) =>{
+
+   const token  =  req?.cookies?.token 
+   
+   if(!token){
+      return res.status(401).send({ massage : 'unauthorized access'})
+   }
+   //verify 
+   jwt.verify(token,process.env.Jwt_ACCES_SECRET , (error , decoded ) => {
+
+      if(error){
+         return res.status(401 ).send({ massage : 'unAuthrozied access'})
+      }
+      req.decoded = decoded;
+      next()
+
+   } )
+   
+ 
+
+}
+
 // mongodb connect
 
+
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
-const uri = `mongodb+srv://ronysiddik21:${process.env.Db_password}@cluster0.ifyeeoo.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
+
+const uri = process.env.MONGO_URI;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
@@ -29,8 +74,56 @@ async function run() {
 
       const CoffeeCollection = client.db("CoffeeDB").collection("coffee")
 
+      // jwt token related apis 
+      // app.post('/jwt', async (req, res) => {
 
-      app.get('/addCoffee', async (req, res) => {
+      //    const { email } = req.body;
+      //    const user = { email };
+
+      //    const token = jwt.sign(user, process.env.Jwt_ACCES_SECRET, { expiresIn: '1d' });
+
+      //    res.cookie('token', token, {
+
+      //       httpOnly: true,
+      //       secure: false
+      //    })
+
+      //    res.send({ succes: true })
+
+
+      // })
+
+      app.post('/jwt', async (req, res) => {
+
+         const userData = req.body;
+         const token = jwt.sign(userData, process.env.Jwt_ACCES_SECRET, { expiresIn: '1d' })
+
+            // set token in the cookies
+         
+            res.cookie("token" , token ,{
+
+               httpOnly:true,
+               secure : false,
+               sameSite: "lax",
+            
+            } )
+
+
+         res.send({ success: true })
+
+      })
+
+
+
+
+
+
+      //
+
+      app.get('/addCoffee', logger,  async (req, res) => {
+
+         //console.log(req.cookies);
+         
 
          const cursor = CoffeeCollection.find();
          const result = await cursor.toArray();
@@ -49,7 +142,7 @@ async function run() {
 
 
 
-      app.post('/addCoffee', async (req, res) => {
+      app.post('/addCoffee',verifyToken, async (req, res) => {
          const data = req.body
 
          const result = await CoffeeCollection.insertOne(data);
@@ -58,7 +151,7 @@ async function run() {
 
       })
 
-      app.put('/addCoffee/:id', async (req, res) => {
+      app.put('/addCoffee/:id',verifyToken, async (req, res) => {
 
          const id = req.params.id;
          const data = req.body;
@@ -84,13 +177,13 @@ async function run() {
 
       })
 
-      app.delete('/addCoffee/:id',async (req,res)=>{
+      app.delete('/addCoffee/:id',verifyToken, async (req, res) => {
          const id = req.params.id
-         const query = {_id:new ObjectId(id) }
+         const query = { _id: new ObjectId(id) }
          const result = await CoffeeCollection.deleteOne(query)
          res.send(result)
-         
-         
+
+
       })
 
 
