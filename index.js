@@ -16,6 +16,7 @@ app.use(cors({
    origin: [
       'http://localhost:5173',
       'https://coffee-store-9.netlify.app',
+      process.env.Frontend_url,
 
    ],
    credentials: true
